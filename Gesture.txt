@@ -1,0 +1,60 @@
+分发、打断、处理
+分发： 分发给子的view ，分发机制的简单描述 ，如非必要不要重写，
+
+打断: 中断触摸事件的传递，只能打断子控件的触摸事件的传递，当前控件不能被打断  true打断，false表示不干扰，如果被打断，谁打断就有谁处理
+
+处理：子控件处理了该次事件，父控件就不需要再做处理，整体是有一个控件处理从头到尾(down到up)，
+特殊情况例外 ScrollView嵌套listview不能滑动、listView的item具有滑动功能
+
+两次 up和down 但是之处理一次
+
+onTouchEvent
+	默认情况下返回false 手动修改可以改变；clickable=true可以改变默认返回值；
+	实现onclickLister，OnTouchListener 等和触摸相关的事件都可以改变默认值
+	返回值改为true以后会被执行多次(move可以被执行多次)，绝对不动执行两次(up down)  后面的执行顺序一般不再执行打断处理
+
+ 处理 true down  -- move -- up 一个控件处理完成，不能主动放弃触摸事件，可以被动剥夺触摸权利  
+ 不处理 false 
+ 
+
+
+/**
+ * dispatchTouchEvent 用于分发事件,系统默认是分发的, 如果返回 true 就不分发,不分发会将事件传递到 activity,事件消失,后续抬起只是直接走一次返回 true 的那个dispatchTouchEvent
+ * onInterceptTouchEvent viewgroup 特有的方法,用于拦截事件,默认是不拦截,如果返回 true 就代表拦截,拦截后将事件给自己,由自己ontouchevent 进行具体的处理,这个方法是在分发之后才执行
+ * ontouchevent 用于处理具体事件的方法,返回 true 代表事件被消费,以后所有的事件都将传递到这个 ontouchevent, 如果返回 false, 事件抛给上一层,同时 以后所有的时间都不会再到这个返回 false 的 ontouchevent
+ *ontoulistener 的优先级比 ontouchevent 高,如果 ontouch 返回 true, 事件就消费结束,如果返回 false 就继续传递给自己的 ontouchevent 处理
+ */
+
+
+ 
+ 手势 ：几种写的方式1、在onTouchEvent里面调用，2、自定义类继承GestureDetector.SimpleOnGestureListener
+ 其他方法返回值无所谓，但是down 的返回值一定返回true，否则其他监听无法监听到事件
+ onshowPress() 100毫秒以内 就不会执行，超过100毫秒就会执行
+ onSingleTapUp  相当于onclick事件 可以处理单击事件
+ 
+ 长按执行onLongPress()
+ 
+ 滑动的时候执行onScroll()
+ distanceX和distanceY表示滑动距离 第一个点减去第二个点 为负数使用的时候需要加负号
+ 图片平移例子
+ 
+ 速度很快的情况下才会出现onFling()
+ 抛动的例子 2048滑动的例子
+ 
+ 
+ OnDoubleTapListener 双击
+ 
+ 里面的三个方法：onSingleTapConfirmed、onDoubleTap、onDoubleTapEvent
+ onSingleTapConfirmed 确认为单击事件，
+ onDoubleTap 被认为是双击事件的时候被执行一次，
+ onDoubleTapEvent 双击事件的开始和结束的时候都被执行一次 里面包含了 down、up、move
+ 
+ 双击事件对单击事件的影响：怎么确认是单击和还是双击呢？
+ 单击抬起一段时间后，没有再次按下确认为单击；
+ 时间为300毫秒
+ 进而双击和三击的识别区分，同样以300毫秒为间隔，连续三次点击事件每两个之间的
+ 时间差不超过300毫秒就可以认为是三击事件
+ 
+ 
+ 
+ 

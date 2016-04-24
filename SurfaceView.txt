@@ -1,0 +1,112 @@
+SurfaceView
+主要用于绘制，比普通的View效率高，自定义view可以实现绘制 重写onDraw()方法
+相对于GLSurfaceView 要低 他是基于OpenGL的 OpenGL是3d绘制框架 他是开源的。
+GLSurfaceView作为一个了解内容，直接作用于屏幕上的像素点上，可以在子线程当总绘制。
+
+SurfaceView 主要用于 视频和摄像头、游戏  绘制和展示。可以在子线程当总绘制。
+缺点 ：复用率很低.
+主要借助于SurfaceHolder，进行回调操作，实现SurfaceHolder.Callback接口
+重写创建，改变，销毁三个方法；
+可以以控件的形式写到xml配置文件当中，也可以自定义SurfaceView类
+又一个方法设置surfaceView在视图界面置顶setZOrderOnTop(true);
+
+
+运行上面的Activity，你将看到一个圆圈，它原始半径是10，然后不断的变大，直到达到100后又恢复到10，这样循环显示，
+视觉效果上说你将看到一个逐渐变大的圆圈。它能做的只是简单的动画效果，具有一些局限性。首先你无法控制动画的显示速度，
+目前它是以最快的 速度显示，但是当你要更快，获取帧数更高的动画呢？ 因为View的帧数是由系统控制的，所以你没办法完成上面的操作。
+如果你需要编写一个游戏，它需要的帧数比较高，那么View就无能为力了，因为它被设计 出来时本来就不是用来处理一些高帧数显示的。
+你可以把View理解为一个经过系统优化的，可以用来高效的执行一些帧数比较低动画的对象，它具有特定的使用 场景，
+比如有一些帧数较低的游戏就可以使用它来完成：贪吃蛇、俄罗斯方块、棋牌类等游戏，因为这些游戏执行的帧数都很低。
+但是如果是一些实时类的游戏，如 射击游戏、塔防游戏、RPG游戏等就没办法使用View来做，因为它的帧数太低了，会导致动画执行不顺畅。
+所以我们需要一个能自己控制执行帧数的对象，SurfaceView因此诞生了。
+
+什么是SurfaceView呢？
+为什么是SurfaceView呢？Surface的意思是表层，表面的意思，那么SurfaceView就是指一个在表层的View对象。为什么 说是在表层呢，
+这是因为它有点特殊跟其他View不一样，其他View是绘制在表层外，而它就是充当表层对象。假设你要在一个球上画画，那么球的表层就当
+做你的画布对象，你画的东西会挡住它的表层，我们默认没使用SurfaceView，那么球的表层就是空白的，如果我们使用了SurfaceView，
+我 们可以理解为我们拿来的球本身表面就具有纹路，你是画再纹路之上的，如果你画的是半透明的，那么你将可以透过你画的东西看到
+球面本身的纹路。SDK的文档 说到：SurfaceView就是在Window上挖一个洞，它就是显示在这个洞里，其他的View是显示在Window上，
+所以View可以显式在 SurfaceView之上，你也可以添加一些层在SurfaceView之上。
+
+SurfaceView还有其他的特性，上面我们讲了它可以控制帧数，那它是什么控制的呢？这就需要了解它的使用机制。
+一般在很多游戏设计中，我们都是开辟一个后台线程计算游戏相关的数据，然后根据这些计算完的新数据再刷新视图对象，
+由于对View执行绘制操作只能在UI线程上， 所以当你在另外一个线程计算完数据后，你需要调用View.invalidate方法通知
+系统刷新View对象，所以游戏相关的数据也需要让UI线程能访问到，这样的设计架构比较复杂，要是能让后台计算的线程能直接访问数据，
+然后更新View对象那改多好。我们知道View的更新只能在UI线程中，所以使用自定义View没办法这么做，但是SurfaceView就可以了。
+它一个很好用的地方就是允许其他线程(不是UI线程)绘制图形(使用Canvas)，根据它这个特性，你就可以控制它的帧数，你如果让这
+个线程1秒执行50次绘制，那么最后显示的就是50帧。
+
+ 
+
+如何使用SurfaceView？
+首先SurfaceView也是一个View，它也有自己的生命周期。因为它需要另外一个线程来执行绘制操作，
+所以我们可以在它生命周期的初始化阶 段开辟一个新线程，然后开始执行绘制，当生命周期的结束阶段我们插入结束绘制线程的操作。
+这些是由其内部一个SurfaceHolder对象完成的。SurfaceHolder，顾名思义，它里面保存了一个对Surface对象的引用，
+而我们执行绘制方法就是操作这个Surface，SurfaceHolder因为保存了对Surface的引用，所以使用它来处理Surface的生命周期，
+说到底 SurfaceView的生命周期其实就是Surface的生命周期，因为SurfaceHolder保存对Surface的引用，
+所以使用 SurfaceHolder来处理生命周期的初始化。
+
+
+注意 ：
+1.因为SurfaceView允许自定义的线程操作Surface对象执行绘制方法，而你可能同时定义多个线程执行绘制，
+所以当你获取 SurfaceHolder中的Canvas对象时记得加同步操作SurfaceHolder.lockCanvas()，避免两个不同的线程同时操作同一个Canvas对象，
+当操作完成后记得调用 SurfaceHolder.unlockCanvasAndPost方法释放掉Canvas锁。
+
+2.在调用doDraw执行绘制时，因为SurfaceView的特点，它会保留之前绘制的图形，所以你需要先清空掉上一次绘制时留下的图形。
+(View则不会，它默认在调用View.onDraw方法时就自动清空掉视图里的东西)。
+
+3. 记得在回调方法：onSurfaceDestroyed方法里将后台执行绘制的LoopThread关闭，这里是使用join方法。
+
+
+例子：使用canvas绘制表盘
+做Canvas矩阵运算之前要存储当前矩阵，
+SurfaceHolder holder
+holder锁画布，使用结束释放画布，有可能出现锁不住的情况？
+三种分析1、holder没有被创建，2、holder
+已经被销毁，3、画布已经被锁住，切没有被释放
+canvas.save();
+矩阵是有叠加效果的，一次操作之后需要恢复到上一次矩阵。
+canvas.restore();
+
+矩阵 缩放 scale()、 旋转 、平移translate()
+横竖屏：平移居中
+int d = (height - width) / 2;
+translate(Math.max(0,-d),Math.max(0,-d))
+
+
+Camera：
+
+Camera camera = Camera.open();//这个方法在5.0的时候过时
+5.0 之后
+CameraDevice = getSystemService();
+使用以下几步：
+1.获取CameraManager实例就可以遍历，查询和打开一个Camera对象。
+2.通过cameraManager对象调研getCameraCharacteristics(String)来获得CameraCharacteristics对象，
+该对象包含设备的设置信息和输出参数。
+3.通过CameraCaptureSession对象为每个预览对象进行预设置，如大小和format（这些格式必须是设备支持的），
+可以调用camera.createCaptureSession(List, CameraCaptureSession.StateCallback, Handler)就可获得此对象。
+4.创建SurfaceView orTextureView (via its SurfaceTexture).  渲染图像。系统底层或调用RenderScript或OpenGles，
+甚至native本地方法来实例传给view的数据。
+5.构造一个CaptureRequest对象，来描述每次捕获图片的具体设置。
+6.最终调用capture()方法完成图像的捕获。
+
+
+//open()打开默认摄像头 一般是后置摄像头
+open(int id) 0表示后置摄像头，1表示前置摄像头
+
+获取摄像头个数：Camera.getNumberOfCameras();
+必须设置预览 没有预览 无法拍照
+默认是横屏 手动设置为竖屏 需要设置 2.2以前 2.2之后 不同的设置方式
+画面模糊需要聚焦：camera.autoFocus() 自动聚焦
+
+有关拍照的预览的发展，不想要预览可以把surfaceView设置为1个像素
+
+拍照流程
+摄像流程
+
+ java.lang.RuntimeException: Fail to connect to camera service
+
+
+
+
+

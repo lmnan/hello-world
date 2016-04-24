@@ -1,0 +1,132 @@
+拍照流程 ：
+1、在Activity的OnCreate函数中设置SurfaceView，包括设置SurfaceHolder.Callback对象和SurfaceHolder对象的类型，具体如下
+   SurfaceView mpreview = (SurfaceView) this.findViewById(R.id.camera_preview);
+	 SurfaceHolder mSurfaceHolder = mpreview.getHolder();
+	 mSurfaceHolder.addCallback(this);
+	 mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+2、在SurfaceHolder.Callback的surfaceCreated函数中，使用Camera的Open函数开机摄像头硬件，这个API在SDK 2.3之前，
+   是没有参数的，2.3以后支持多摄像头，所以开启前可以通过getNumberOfCameras先获取摄像头数目，再通过getCameraInfo得
+   到需要开启的摄像头id，然后传入Open函数开启摄像头，假如摄像头开启成功则返回一个Camera对象，否则就抛出异常
+3、开启成功的情况下，在SurfaceHolder.Callback的surfaceChanged函数中调用getParameters函数得到已打开的摄像头的配置参数
+   Parameters对象，如果有需要就修改对象的参数，然后调用setParameters函数设置进去（SDK2.2以后，还可以通过
+   Camera：：setDisplayOrientation设置方向）；
+4、同样在surfaceChanged函数中，通过Camera：：setPreviewDisplay为摄像头设置SurfaceHolder对象，
+   设置成功后调用Camera::startPreview函数开启预览功能，上面3,4两步的代码可以如下所示
+		public void surfaceChanged(SurfaceHolder holder, int format, int w, int h){
+			//已经获得Surface的width和height，设置Camera的参数
+			Camera.Parameters parameters = camera.getParameters();
+			parameters.setPreviewSize(w, h);
+			List<Size> vSizeList = parameters.getSupportedPictureSizes();
+			for(int num = 0; num < vSizeList.size(); num++){
+				Size vSize = vSizeList.get(num);
+			}
+		if(this.getResources().getConfiguration().orientation != Configuration.ORIENTATION_LANDSCAPE){
+		//如果是竖屏
+			parameters.set("orientation", "portrait");
+		//在2.2以上可以使用
+		//camera.setDisplayOrientation(90);
+		}else{
+			parameters.set("orientation", "landscape");
+			//在2.2以上可以使用
+			//camera.setDisplayOrientation(0);
+		}
+		camera.setParameters(parameters);
+	try {
+		//设置显示
+		camera.setPreviewDisplay(holder);
+		} catch (IOException exception) {
+		camera.release();
+		camera = null;
+		}
+		//开始预览
+		camera.startPreview();
+	}
+5、假设要支持自动对焦功能，则在需要的情况下，或者在上述surfaceChanged调用完startPreview函数后，
+	 可以调用Camera::autoFocus函数来设置自动对焦回调函数，该步是可选操作，有些设备可能不支持，
+	 可以通过Camera::getFocusMode函数查询。代码可以参考如下：
+	 // 自动对焦
+	 camera.autoFocus(new AutoFocusCallback(){
+	 @Override
+	 public void onAutoFocus(boolean success, Camera camera){
+		if (success){
+		// success为true表示对焦成功，改变对焦状态图像
+		ivFocus.setImageResource(R.drawable.focus2);
+		}}
+		});
+
+6、在需要拍照的时候，调用takePicture(Camera.ShutterCallback, Camera.PictureCallback, Camera.PictureCallback,
+	 Camera.PictureCallback)函数来完成拍照，这个函数中可以四个回调接口，ShutterCallback是快门按下的回调，
+	 在这里我们可以设置播放“咔嚓”声之类的操作，后面有三个PictureCallback接口，分别对应三份图像数据，
+	 分别是原始图像、缩放和压缩图像和JPG图像，图像数据可以在PictureCallback接口的void onPictureTaken(byte[] data, Camera camera)
+	 中获得，三份数据相应的三个回调正好按照参数顺序调用，通常我们只关心JPG图像数据，此时前面两个PictureCallback接口参数可以直接
+	 传null；
+7、每次调用takePicture获取图像后，摄像头会停止预览，假如需要继续拍照，则我们需要在上面的PictureCallback的
+ 		onPictureTaken函数末尾，再次调用Camera::startPreview函数；
+8、在不需要拍照的时候，我们需要主动调用Camera::stopPreview函数停止预览功能，并且调用Camera::release函数释放Camera，
+   以便其他应用程序调用。SDK中建议放在Activity的Pause函数中，但是我觉得放在surfaceDestroyed函数中更好，示例代码如下
+		// 停止拍照时调用该方法
+		public void surfaceDestroyed(SurfaceHolder holder){
+		// 释放手机摄像头
+			camera.release();
+		}
+以上就是自己实现拍照程序的的流程，一般还可以获取预览帧的图像数据，可以分别通过Camera::setPreviewCallback
+和Camera::setOneShotPreviewCallback来设置每帧或下一帧图像数据的回调。
+
+5.0 之后
+CameraDevice = getSystemService();
+使用以下几步：
+1.获取CameraManager实例就可以遍历，查询和打开一个Camera对象。
+2.通过cameraManager对象调研getCameraCharacteristics(String)来获得CameraCharacteristics对象，
+该对象包含设备的设置信息和输出参数。
+3.通过CameraCaptureSession对象为每个预览对象进行预设置，如大小和format（这些格式必须是设备支持的），
+可以调用camera.createCaptureSession(List, CameraCaptureSession.StateCallback, Handler)就可获得此对象。
+4.创建SurfaceView orTextureView (via its SurfaceTexture).  渲染图像。系统底层或调用RenderScript或OpenGles，
+甚至native本地方法来实例传给view的数据。
+5.构造一个CaptureRequest对象，来描述每次捕获图片的具体设置。
+6.最终调用capture()方法完成图像的捕获。
+
+
+摄像流程
+
+摄像流程也是需要预览的，而且流程上与拍照流程在起始的1~4步流程和结束的8流程是一样的，唯一不同的是6和7两个步骤，
+至于5自动对焦本身就是可选的，在摄像流程也没必要。
+6、开启视频录制，需要创建一个MediaRecorder对象，并调用Camera::unLock操作解锁摄像头，因为默认Camera都是锁定的，
+	  只有解锁后MediaRecorder等多媒体进程调用，并设置一些参数，然后调用MediaRecorder:: start开启录制具体可以参阅如下代码:
+		MediaRecorder mMediaRecorder = new MediaRecorder();
+		// Unlock the camera object before passing it to media recorder.
+		camera.unlock();
+		mMediaRecorder.setCamera(camera);
+		mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
+		mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+		mMediaRecorder.setProfile(mProfile);
+		mMediaRecorder.setMaxDuration(100000);//ms为单位
+		long dateTaken = System.currentTimeMillis();
+		Date date = new Date(dateTaken);
+		SimpleDateFormat dateFormat = new SimpleDateFormat(getString(R.string.video_file_name_format));
+		String title = dateFormat.format(date);
+		String filename = title + ".3gp"; // Used when emailing.
+		String cameraDirPath = ImageManager.CAMERA_IMAGE_BUCKET_NAME;
+		String filePath = cameraDirPath + "/" + filename;
+		File cameraDir = new File(cameraDirPath);
+		cameraDir.mkdirs();
+		mMediaRecorder.setOutputFile(filePath);
+		try {
+		mMediaRecorder.prepare();
+		mMediaRecorder.start(); // Recording is now started
+		} catch (RuntimeException e) {
+		Log.e(TAG, "Could not start media recorder. ", e);
+		return;
+		}
+7、上面设置了最大间隔为100s，当100是视频录制结束，录制就会被停止，如果没有设时长和文件大小限制，那么通常需要调用
+		MediaRecorder:: stop函数主动停止视频的录制，并将Camera对象通过lock函数继续加锁，示例代码如下
+		mMediaRecorder.stop();
+		mMediaRecorder.reset();
+		mMediaRecorder.release();
+		mMediaRecorder = null;
+		if(camera != null)
+		camera.lock();
+		之后的操作根据交互要么重新录制要么就释放Camera对象回到拍照流程的8步骤了。
+
+
+
+
