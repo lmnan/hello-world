@@ -1,0 +1,62 @@
+
+XML Pull解析
+
+在android系统中，很多资源文件中,很多都是xml格式，在android系统中解析这些xml的方式，是使用pull解析器进行解析的，
+它和sax解析一样（个人感觉要比sax简单点），也是采用事件驱动进行解析的，当pull解析器，开始解析之后，我们可以调用它的next（）方法，
+来获取下一个解析事件（就是开始文档，结束文档，开始标签，结束标签），
+当处于某个元素时可以调用XmlPullParser的getAttribute()方法来获取属性的值，
+也可调用它的nextText()获取本节点的值。
+
+public static List<Student> getList() {
+		List<Student> list = null;
+		Student student = null;
+
+		try {
+			XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+			XmlPullParser parser = factory.newPullParser();
+			parser.setInput(new FileReader("student01.xml"));
+			// 获得解析事件的类型，状态码，
+			int type = parser.getEventType();
+
+			while (type != 1) {// end_document
+				// 获得标签名
+				String tag = parser.getName();
+				switch (type) {
+				case 0:// start_document
+					list = new ArrayList<Student>();
+					break;
+				case 2:// start_tag
+					if ("student".equals(tag)) {
+						student = new Student();
+					}
+					if ("id".equals(tag)) {
+						student.setId(Integer.parseInt(parser.nextText()));
+					} else if ("name".equals(tag)) {
+						student.setName(parser.nextText());
+					} else if ("age".equals(tag)) {
+						student.setAge(Integer.parseInt(parser.nextText()));
+					}
+					break;
+				case 3:// end_tag
+					if("student".equals(tag))
+						list.add(student);
+					break;
+				}
+				type = parser.next();
+			}
+		} catch (XmlPullParserException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NumberFormatException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return list;
+	}
